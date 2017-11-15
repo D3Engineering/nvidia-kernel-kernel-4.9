@@ -15,3 +15,4 @@ obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
 
 # High Level Interfaces
 obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+obj-$(CONFIG_OF_FPGA_REGION)		+= of-fpga-region.o
