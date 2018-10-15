@@ -465,8 +465,8 @@ static int zynq_fpga_probe(struct platform_device *pdev)
 
 	clk_disable(priv->clk);
 
-	mgr = fpga_mgr_create(dev, "Xilinx Zynq FPGA Manager",
-			      &zynq_fpga_ops, priv);
+	mgr = devm_fpga_mgr_create(dev, "Xilinx Zynq FPGA Manager",
+				   &zynq_fpga_ops, priv);
 	if (!mgr)
 		return -ENOMEM;
 
