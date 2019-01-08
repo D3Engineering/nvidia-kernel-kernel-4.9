@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/leds.h>
 
@@ -50,6 +51,20 @@ static void sdhci_finish_data(struct sdhci_host *);
 static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
 static void sdhci_regulator_config_pre(struct mmc_host *mmc, int vdd,
 						bool flag);
+
+#ifdef CONFIG_PM
+static int sdhci_runtime_pm_get(struct sdhci_host *host);
+static int sdhci_runtime_pm_put(struct sdhci_host *host);
+#else
+static inline int sdhci_runtime_pm_get(struct sdhci_host *host)
+{
+	return 0;
+}
+static inline int sdhci_runtime_pm_put(struct sdhci_host *host)
+{
+	return 0;
+}
+#endif
 
 static void sdhci_enable_host_interrupts(struct mmc_host *mmc, bool enable)
 {
@@ -2165,11 +2180,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	unsigned int tuning_count = 0;
 	bool hs400_tuning;
 
+	sdhci_runtime_pm_get(host);
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->ops->skip_retuning)
 		if (host->ops->skip_retuning(host)) {
 			spin_unlock_irqrestore(&host->lock, flags);
+			sdhci_runtime_pm_put(host);
 			return 0;
 		}
 
@@ -2222,6 +2239,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	if (host->ops->platform_execute_tuning) {
 		spin_unlock_irqrestore(&host->lock, flags);
 		err = host->ops->platform_execute_tuning(host, opcode);
+		sdhci_runtime_pm_put(host);
 		return err;
 	}
 
@@ -2404,6 +2422,8 @@ out:
 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
 out_unlock:
 	spin_unlock_irqrestore(&host->lock, flags);
+	sdhci_runtime_pm_put(host);
+
 	return err;
 }
 
@@ -3254,6 +3274,17 @@ int sdhci_resume_host(struct sdhci_host *host)
 }
 
 EXPORT_SYMBOL_GPL(sdhci_resume_host);
+
+static int sdhci_runtime_pm_get(struct sdhci_host *host)
+{
+	return pm_runtime_get_sync(host->mmc->parent);
+}
+
+static int sdhci_runtime_pm_put(struct sdhci_host *host)
+{
+	pm_runtime_mark_last_busy(host->mmc->parent);
+	return pm_runtime_put_autosuspend(host->mmc->parent);
+}
 
 int sdhci_runtime_suspend_host(struct sdhci_host *host)
 {
