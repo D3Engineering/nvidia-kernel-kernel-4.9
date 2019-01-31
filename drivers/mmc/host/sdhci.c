@@ -2247,8 +2247,9 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	 * Set data timeout counter to 0 as the timeout value would be more
 	 * than sufficient to allow tuning block transfer and reset the data
 	 * FSM before issuing CMD reset in case of Buffer read ready interrupt
-	 * timeout
+	 * timeout. This applies to T210 ex. platforms
 	 */
+	sdhci_writeb(host, 0xE, SDHCI_TIMEOUT_CONTROL);
 	if (!(host->quirks2 & SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK))
 		sdhci_writeb(host, 0, SDHCI_TIMEOUT_CONTROL);
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
@@ -2338,7 +2339,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		/* Wait for Buffer Read Ready interrupt */
 		wait_event_timeout(host->buf_ready_int,
 					(host->tuning_done == 1),
-					msecs_to_jiffies(50));
+					msecs_to_jiffies(150));
 		spin_lock_irqsave(&host->lock, flags);
 
 		if (!host->tuning_done) {
