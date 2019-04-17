@@ -6,6 +6,7 @@ dts-dirs += apm
 dts-dirs += arm
 dts-dirs += broadcom
 dts-dirs += cavium
+dts-dirs += d3
 dts-dirs += exynos
 dts-dirs += freescale
 dts-dirs += hisilicon
@@ -93,6 +94,18 @@ DTC_FLAGS += $(addprefix -i $(tegra-dtstree)/,$(dts-include))
 DTCCPP_FLAGS += $(addprefix -I$(tegra-dtstree)/,$(dts-include))
 endif
 endif
+
+# Include D3 Makefiles for dtb Note that you can't use patsubst in
+# this case with wildcard because of expansion time rules...hence all
+# of this (using Nvidia's implementation as a template)
+d3_makefile=$(foreach d,$(wildcard $1*), $(call d3_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
+d3_mfiles = $(call d3_makefile, $(tegra-dtstree)/../d3/, Makefile)
+include $(d3_mfiles)
+d3-dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/d3/,$(d3-dtb-y))
+dtb-y += $(d3-dtb-y)
+
+
+
 DTB_LIST += $(dtb-y)
 DTB_NEW_RULE_LIST := $(dtb-y)
 DTBO_LIST += $(dtbo-y)
