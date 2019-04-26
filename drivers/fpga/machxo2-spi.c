@@ -34,6 +34,7 @@
 #define MACHXO2_LOW_DELAY_USEC		5
 #define MACHXO2_HIGH_DELAY_USEC		200
 #define MACHXO2_REFRESH_USEC		4800
+#define MACHXO2_LOOP_FOREVER		0
 #define MACHXO2_MAX_BUSY_LOOP		128
 #define MACHXO2_MAX_REFRESH_LOOP	16
 
@@ -112,17 +113,22 @@ static void dump_status_reg(unsigned long *status)
 		 test_bit(DVER, status), get_err_string(get_err(status)));
 }
 
-static int wait_until_not_busy(struct spi_device *spi)
+static int wait_until_not_busy(struct spi_device *spi, int max_loops)
 {
 	unsigned long status;
 	int ret, loop = 0;
 
 	do {
 		ret = get_status(spi, &status);
-		if (ret)
+		if (ret) {
+			dump_status_reg(&status);
 			return ret;
-		if (++loop >= MACHXO2_MAX_BUSY_LOOP)
+		}
+		loop++;
+		if (MACHXO2_LOOP_FOREVER != max_loops && loop >= max_loops) {
+			dump_status_reg(&status);
 			return -EBUSY;
+		}
 	} while (test_bit(BUSY, &status));
 
 	return 0;
@@ -146,7 +152,7 @@ static int machxo2_cleanup(struct fpga_manager *mgr)
 	if (ret)
 		goto fail;
 
-	ret = wait_until_not_busy(spi);
+	ret = wait_until_not_busy(spi, MACHXO2_MAX_BUSY_LOOP);
 	if (ret)
 		goto fail;
 
@@ -214,14 +220,14 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 	if (ret)
 		goto fail;
 
-	ret = wait_until_not_busy(spi);
+	ret = wait_until_not_busy(spi, MACHXO2_LOOP_FOREVER);
 	if (ret)
 		goto fail;
 
 	get_status(spi, &status);
+	dump_status_reg(&status);
 	if (test_bit(FAIL, &status))
 		goto fail;
-	dump_status_reg(&status);
 
 	spi_message_init(&msg);
 	tx[2].tx_buf = &initaddr;
@@ -298,7 +304,7 @@ static int machxo2_write_complete(struct fpga_manager *mgr,
 	ret = spi_sync(spi, &msg);
 	if (ret)
 		goto fail;
-	ret = wait_until_not_busy(spi);
+	ret = wait_until_not_busy(spi, MACHXO2_MAX_BUSY_LOOP);
 	if (ret)
 		goto fail;
 
