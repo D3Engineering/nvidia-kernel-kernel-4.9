@@ -332,7 +332,11 @@ static int machxo2_write_complete(struct fpga_manager *mgr,
 		    get_err(&status) == ENOERR)
 			break;
 		if (++refreshloop == MACHXO2_MAX_REFRESH_LOOP) {
-			machxo2_cleanup(mgr);
+			dev_err(&mgr->dev, "Max refresh retry reached.\n");
+			ret = machxo2_cleanup(mgr);
+			if (ret)
+				goto fail;
+			ret = -EBUSY;
 			goto fail;
 		}
 	} while (1);
