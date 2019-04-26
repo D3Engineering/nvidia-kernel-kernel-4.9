@@ -210,9 +210,21 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 	spi_message_init(&msg);
 	tx[0].tx_buf = &enable;
 	tx[0].len = sizeof(enable);
-	tx[0].delay_usecs = MACHXO2_LOW_DELAY_USEC;
 	spi_message_add_tail(&tx[0], &msg);
+	ret = spi_sync(spi, &msg);
+	if (ret)
+		goto fail;
 
+	ret = wait_until_not_busy(spi, MACHXO2_MAX_BUSY_LOOP);
+	if (ret)
+		goto fail;
+
+	get_status(spi, &status);
+	dump_status_reg(&status);
+	if (test_bit(FAIL, &status))
+		goto fail;
+
+	spi_message_init(&msg);
 	tx[1].tx_buf = &erase;
 	tx[1].len = sizeof(erase);
 	spi_message_add_tail(&tx[1], &msg);
@@ -271,11 +283,16 @@ static int machxo2_write(struct fpga_manager *mgr, const char *buf,
 		spi_message_init(&msg);
 		tx.tx_buf = payload;
 		tx.len = MACHXO2_BUF_SIZE;
-		tx.delay_usecs = MACHXO2_HIGH_DELAY_USEC;
 		spi_message_add_tail(&tx, &msg);
 		ret = spi_sync(spi, &msg);
 		if (ret) {
 			dev_err(&mgr->dev, "Error loading the bitstream.\n");
+			return ret;
+		}
+
+		ret = wait_until_not_busy(spi, MACHXO2_MAX_BUSY_LOOP);
+		if (ret) {
+			dev_err(&mgr->dev, "FPGA busy while loading the bitstream.\n");
 			return ret;
 		}
 	}
