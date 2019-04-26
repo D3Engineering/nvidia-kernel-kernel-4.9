@@ -287,13 +287,13 @@ ret_no_info:
  * Returns 0 for success or negative error code for failure.
  */
 static int of_fpga_region_notify_pre_apply(struct fpga_region *region,
-					   struct of_overlay_notify_data *nd)
+					   struct device_node *overlay)
 {
 	struct device *dev = &region->dev;
 	struct fpga_image_info *info;
 	int ret;
 
-	info = of_fpga_region_parse_ov(region, nd->overlay);
+	info = of_fpga_region_parse_ov(region, overlay);
 	if (IS_ERR(info))
 		return PTR_ERR(info);
 
@@ -377,7 +377,7 @@ static int of_fpga_region_notify(struct notifier_block *nb,
 	ret = 0;
 	switch (action) {
 	case OF_OVERLAY_PRE_APPLY:
-		ret = of_fpga_region_notify_pre_apply(region, nd);
+		ret = of_fpga_region_notify_pre_apply(region, nd->overlay);
 		break;
 
 	case OF_OVERLAY_POST_REMOVE:
@@ -424,6 +424,10 @@ static int of_fpga_region_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, region);
 
 	dev_info(dev, "FPGA Region probed\n");
+
+	if(!of_fpga_region_notify_pre_apply(region, np)) {
+		dev_info(dev, "Loaded static firmware\n");
+	}
 
 	return 0;
 
