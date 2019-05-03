@@ -12,6 +12,7 @@ dts-dirs += freescale
 dts-dirs += hisilicon
 dts-dirs += marvell
 dts-dirs += mediatek
+# dts-dirs += nuro
 dts-dirs += qcom
 dts-dirs += renesas
 dts-dirs += rockchip
@@ -103,6 +104,17 @@ d3_mfiles = $(call d3_makefile, $(tegra-dtstree)/../d3/, Makefile)
 include $(d3_mfiles)
 d3-dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/d3/,$(d3-dtb-y))
 dtb-y += $(d3-dtb-y)
+
+DTCCPP_FLAGS += -I$(tegra-dtstree)/../d3
+
+# Include Nuro Makefiles for dtb Note that you can't use patsubst in
+# this case with wildcard because of expansion time rules...hence all
+# of this (using Nvidia's implementation as a template)
+nuro_makefile=$(foreach d,$(wildcard $1*), $(call nuro_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
+nuro_mfiles = $(call nuro_makefile, $(tegra-dtstree)/../nuro/, Makefile)
+include $(nuro_mfiles)
+nuro-dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nuro/,$(nuro-dtb-y))
+dtb-y += $(nuro-dtb-y)
 
 
 
