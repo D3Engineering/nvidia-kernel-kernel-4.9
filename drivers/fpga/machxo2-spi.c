@@ -221,8 +221,10 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 
 	get_status(spi, &status);
 	dump_status_reg(&status);
-	if (test_bit(FAIL, &status))
+	if (test_bit(FAIL, &status)) {
+		ret = -1;
 		goto fail;
+	}
 
 	spi_message_init(&msg);
 	tx[1].tx_buf = &erase;
@@ -238,8 +240,10 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 
 	get_status(spi, &status);
 	dump_status_reg(&status);
-	if (test_bit(FAIL, &status))
+	if (test_bit(FAIL, &status)) {
+		ret = -1;
 		goto fail;
+	}
 
 	spi_message_init(&msg);
 	tx[2].tx_buf = &initaddr;
@@ -254,7 +258,7 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 
 	return 0;
 fail:
-	dev_err(&mgr->dev, "Error during FPGA init.\n");
+	dev_err(&mgr->dev, "Error during FPGA init: %d\n", ret);
 
 	return ret;
 }
