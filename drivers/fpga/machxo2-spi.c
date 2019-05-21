@@ -59,6 +59,12 @@
 #define EOVERFL	6 /* overflow error */
 #define ESDMEOF	7 /* SDM EOF */
 
+struct machxo2_spi {
+	struct fpga_manager *mgr;
+	struct gpio_desc *programn;
+	struct gpio_desc *initn;
+};
+
 static inline u8 get_err(unsigned long *status)
 {
 	return (*status >> ERRBITS) & ERRMASK;
@@ -190,6 +196,7 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 			      const char *buf, size_t count)
 {
 	struct spi_device *spi = mgr->priv;
+	struct machxo2_spi *machxo2_spi = spi_get_drvdata(spi);
 	struct spi_message msg;
 	struct spi_transfer tx[3];
 	static const u8 enable[] = ISC_ENABLE;
@@ -202,6 +209,24 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 		dev_err(&mgr->dev,
 			"Partial reconfiguration is not supported\n");
 		return -ENOTSUPP;
+	}
+
+	if (machxo2_spi->programn) {
+		gpiod_set_value(machxo2_spi->programn, 1);
+		ndelay(55);
+		gpiod_set_value(machxo2_spi->programn, 0);
+
+		if (machxo2_spi->initn) {
+			ndelay(100);
+			// Wait for initn to go high.
+			do {
+				ret = gpiod_get_value(machxo2_spi->initn);
+				if (ret < 0)
+					goto fail;
+			} while (!ret);
+		} else {
+			udelay(150);
+		}
 	}
 
 	get_status(spi, &status);
@@ -382,28 +407,41 @@ static const struct fpga_manager_ops machxo2_ops = {
 static int machxo2_spi_probe(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
-	struct fpga_manager *mgr;
+	struct machxo2_spi *machxo2_spi;
 
 	if (spi->max_speed_hz > MACHXO2_MAX_SPEED) {
 		dev_err(dev, "Speed is too high\n");
 		return -EINVAL;
 	}
 
-	mgr = devm_fpga_mgr_create(dev, "Lattice MachXO2 SPI FPGA Manager",
-				   &machxo2_ops, spi);
-	if (!mgr)
+	machxo2_spi = devm_kzalloc(dev, sizeof(*machxo2_spi), GFP_KERNEL);
+	if (!machxo2_spi)
 		return -ENOMEM;
 
-	spi_set_drvdata(spi, mgr);
+	machxo2_spi->programn = devm_gpiod_get_optional(dev, "programn",
+		GPIOD_OUT_HIGH);
+	if (!machxo2_spi->programn)
+		dev_dbg(dev, "Programn pin not set\n");
 
-	return fpga_mgr_register(mgr);
+	machxo2_spi->initn = devm_gpiod_get_optional(dev, "initn", GPIOD_IN);
+	if (!machxo2_spi->initn)
+		dev_dbg(dev, "Initn pin not set\n");
+
+	machxo2_spi->mgr = devm_fpga_mgr_create(dev,
+		"Lattice MachXO2 SPI FPGA Manager", &machxo2_ops, spi);
+	if (!machxo2_spi->mgr)
+		return -ENOMEM;
+
+	spi_set_drvdata(spi, machxo2_spi);
+
+	return fpga_mgr_register(machxo2_spi->mgr);
 }
 
 static int machxo2_spi_remove(struct spi_device *spi)
 {
-	struct fpga_manager *mgr = spi_get_drvdata(spi);
+	struct machxo2_spi *machxo2_spi = spi_get_drvdata(spi);
 
-	fpga_mgr_unregister(mgr);
+	fpga_mgr_unregister(machxo2_spi->mgr);
 
 	return 0;
 }
