@@ -205,6 +205,8 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 	unsigned long status;
 	int ret;
 
+	dev_dbg(&mgr->dev, "Starting write initialization\n");
+
 	if ((info->flags & FPGA_MGR_PARTIAL_RECONFIG)) {
 		dev_err(&mgr->dev,
 			"Partial reconfiguration is not supported\n");
@@ -250,6 +252,8 @@ static int machxo2_write_init(struct fpga_manager *mgr,
 		ret = -1;
 		goto fail;
 	}
+
+	dev_dbg(&mgr->dev, "Erasing flash\n");
 
 	spi_message_init(&msg);
 	tx[1].tx_buf = &erase;
@@ -299,6 +303,8 @@ static int machxo2_write(struct fpga_manager *mgr, const char *buf,
 	unsigned long status;
 	int i, ret;
 
+	dev_dbg(&mgr->dev, "Starting write\n");
+
 	if (count % MACHXO2_PAGE_SIZE != 0) {
 		dev_err(&mgr->dev, "Malformed payload.\n");
 		return -EINVAL;
@@ -342,6 +348,8 @@ static int machxo2_write_complete(struct fpga_manager *mgr,
 	unsigned long status;
 	int ret, refreshloop = 0;
 
+	dev_dbg(&mgr->dev, "Completing write\n");
+
 	memset(tx, 0, sizeof(tx));
 	spi_message_init(&msg);
 	tx[0].tx_buf = &progdone;
@@ -360,6 +368,8 @@ static int machxo2_write_complete(struct fpga_manager *mgr,
 		machxo2_cleanup(mgr);
 		goto fail;
 	}
+
+	dev_dbg(&mgr->dev, "Starting refresh\n");
 
 	do {
 		spi_message_init(&msg);
