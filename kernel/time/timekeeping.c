@@ -320,6 +320,17 @@ static void tk_setup_internals(struct timekeeper *tk, struct clocksource *clock)
 		tk->tkr_mono.xtime_nsec = ((tk->tkr_mono.cycle_last) * clock->mult);
 		tk_normalize_xtime(tk);
 	}
+
+	/* update clocksource offset_ns
+	 *
+	 * NOTE: if CONFIG_SCHED_POR_TIME is enabled, this will be
+	 * broken. But we don't expect CONFIG_SCHED_POR_TIME to be
+	 * enabled for this use case
+	 */
+	tmp = mul_u64_u32_shr(tk->tkr_raw.cycle_last,
+			clock->mult, clock->shift);
+	clock->offset_ns = tmp - tk->raw_sec * NSEC_PER_SEC -
+				(tk->tkr_raw.xtime_nsec >> clock->shift);
 }
 
 /* Timekeeper helper functions. */
@@ -1701,14 +1712,9 @@ void timekeeping_resume(void)
 	 *	suspend-nonstop clocksource -> persistent clock -> rtc
 	 * The less preferred source will only be tried if there is no better
 	 * usable source. The rtc part is handled separately in rtc core code.
-	 * Changed preference as part of bug 200258431 to
-	 * persistent clock -> suspend-nonstop clocksource -> rtc
 	 */
 	cycle_now = tk_clock_read(&tk->tkr_mono);
-	if (timespec64_compare(&ts_new, &timekeeping_suspend_time) > 0) {
-		ts_delta = timespec64_sub(ts_new, timekeeping_suspend_time);
-		sleeptime_injected = true;
-	} else if ((clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP) &&
+	if ((clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP) &&
 		cycle_now > tk->tkr_mono.cycle_last) {
 		u64 num, max = ULLONG_MAX;
 		u32 mult = clock->mult;
@@ -1730,8 +1736,12 @@ void timekeeping_resume(void)
 			cycle_delta -= num * max;
 		}
 		nsec += ((u64) cycle_delta * mult) >> shift;
+		tk->tkr_raw.clock->offset_ns += nsec;
 
 		ts_delta = ns_to_timespec64(nsec);
+		sleeptime_injected = true;
+	} else if (timespec64_compare(&ts_new, &timekeeping_suspend_time) > 0) {
+		ts_delta = timespec64_sub(ts_new, timekeeping_suspend_time);
 		sleeptime_injected = true;
 	}
 
