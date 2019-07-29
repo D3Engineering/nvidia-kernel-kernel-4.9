@@ -30,6 +30,13 @@ config FPGA_MGR_MACHXO2_SPI
 	  FPGA manager driver support for Lattice MachXO2 configuration
 	  over slave SPI interface.
 
+config FPGA_MGR_MACHXO2_I2C
+	tristate "Lattice MachXO2 I2C"
+	depends on I2C
+	help
+	  FPGA manager driver support for Lattice MachXO2 configuration
+	  over I2C interface.
+
 config FPGA_BRIDGE
 	tristate "FPGA Bridge Framework"
 	help
