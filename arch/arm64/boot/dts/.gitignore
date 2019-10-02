@@ -1,1 +1,4 @@
 *.dtb
+
+# dtbo files are generated here during in-tree builds
+*.dtbo
