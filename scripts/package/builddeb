@@ -2,6 +2,7 @@
 #
 # builddeb 1.3
 # Copyright 2003 Wichert Akkerman <wichert@wiggy.net>
+# Copyright 2019 D3 Engineering, LLC
 #
 # Simple script to generate a deb package for a Linux kernel. All the
 # complexity of what to do with a kernel after it is installed or removed
@@ -11,6 +12,16 @@
 # removal.
 
 set -e
+set -x
+
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+# Create variables referenced by create_package()
+debarch=
+forcearch=
 
 create_package() {
 	local pname="$1" pdir="$2"
@@ -29,9 +40,15 @@ create_package() {
 	# in case we are in a restrictive umask environment like 0077
 	chmod -R a+rX "$pdir"
 
+	# Give the outside world a chance to customize
+	if [ -n "$BUILDDEB_PREPKG_HOOK" ]; then
+		time "$BUILDDEB_PREPKG_HOOK" "$pname" "$pdir" || \
+			die "Hook $BUILDDEB_PREPKG_HOOK failed - exit status $?"
+	fi
+
 	# Create the package
-	dpkg-gencontrol $forcearch -Vkernel:debarch="${debarch}" -p$pname -P"$pdir"
-	dpkg --build "$pdir" ..
+	time dpkg-gencontrol $forcearch -Vkernel:debarch="${debarch}" -p$pname -P"$pdir"
+	time dpkg --build "$pdir" ..
 }
 
 set_debarch() {
@@ -101,8 +118,6 @@ fwpackagename=linux-firmware-image-$version
 kernel_headers_packagename=linux-headers-$version
 libc_headers_packagename=linux-libc-dev
 dbg_packagename=$packagename-dbg
-debarch=
-forcearch=
 set_debarch
 
 if [ "$ARCH" = "um" ] ; then
@@ -124,6 +139,9 @@ parisc|mips|powerpc)
 esac
 
 BUILD_DEBUG="$(grep -s '^CONFIG_DEBUG_INFO=y' $KCONFIG_CONFIG || true)"
+if [ -n "$BUILDDEB_NO_DEBUG_PACKAGE" ]; then	# Permit the caller to skip
+	BUILD_DEBUG=
+fi
 
 # Setup the directory structure
 rm -rf "$tmpdir" "$fwdir" "$kernel_headers_dir" "$libc_headers_dir" "$dbg_dir" $objtree/debian/files
@@ -158,7 +176,7 @@ if grep -q "^CONFIG_OF=y" $KCONFIG_CONFIG ; then
 fi
 
 if grep -q '^CONFIG_MODULES=y' $KCONFIG_CONFIG ; then
-	INSTALL_MOD_PATH="$tmpdir" $MAKE KBUILD_SRC= modules_install
+	$MAKE INSTALL_MOD_PATH="$tmpdir" KBUILD_SRC= modules_install
 	rm -f "$tmpdir/lib/modules/$version/build"
 	rm -f "$tmpdir/lib/modules/$version/source"
 	if [ "$ARCH" = "um" ] ; then
@@ -180,7 +198,7 @@ if grep -q '^CONFIG_MODULES=y' $KCONFIG_CONFIG ; then
 		# resign stripped modules
 		MODULE_SIG_ALL="$(grep -s '^CONFIG_MODULE_SIG_ALL=y' $KCONFIG_CONFIG || true)"
 		if [ -n "$MODULE_SIG_ALL" ]; then
-			INSTALL_MOD_PATH="$tmpdir" $MAKE KBUILD_SRC= modules_sign
+			$MAKE INSTALL_MOD_PATH="$tmpdir" KBUILD_SRC= modules_sign
 		fi
 	fi
 fi
@@ -301,7 +319,7 @@ EOF
 
 # Generate copyright file
 cat <<EOF > debian/copyright
-This is a packacked upstream version of the Linux kernel.
+This is a packaged upstream version of the Linux kernel.
 
 The sources may be found at most Linux ftp sites, including:
 ftp://ftp.kernel.org/pub/linux/kernel
