@@ -37,7 +37,7 @@ DTC_FLAGS += -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
 DTCCPP_FLAGS := -I$(tegra-dtstree)/soc/tegra/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 DTCCPP_FLAGS += -DLINUX_VERSION=409
-DTCCPP_FLAGS += -DD3_JETSON_BSP_BUILDID='$(D3_JETSON_BSP_BUILDID)'
+DTCCPP_FLAGS += $(D3_DTCCPP_FLAGS)
 
 ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t210/kernel-dts
