@@ -1,7 +1,7 @@
 /*
  * ADMA driver for Nvidia's Tegra210 ADMA controller.
  *
- * Copyright (c) 2016-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2020, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -582,7 +582,8 @@ static unsigned int tegra_adma_get_residue(struct tegra_adma_chan *tdc)
 	/* get transferred data count */
 	tc_transferred = ch_regs->tc - tc_remain;
 
-	tot_xfer = (uint64_t)(tdc->tx_buf_count * ch_regs->tc) + tc_transferred;
+	tot_xfer = (uint64_t)((uint64_t)tdc->tx_buf_count *
+			(uint64_t)ch_regs->tc) + tc_transferred;
 	tot_xfer %= desc->buf_len;
 
 	return desc->buf_len - tot_xfer;
@@ -1073,8 +1074,13 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	if (of_property_read_u32(node, "dma-channels",
-						&tdma->nr_channels))
+						&tdma->nr_channels)) {
+#if IS_ENABLED(CONFIG_SND_SOC_TEGRA210_ADSP_ALT)
+		tdma->nr_channels = cdata->nr_channels >> 1;
+#else
 		tdma->nr_channels = cdata->nr_channels;
+#endif
+	}
 
 	if (tdma->nr_channels > cdata->nr_channels)
 		tdma->nr_channels = cdata->nr_channels;
@@ -1098,7 +1104,6 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		tdma->is_virt = true;
 	else
 		tdma->is_virt = false;
-
 
 	tdma->dev = &pdev->dev;
 	dma_device = &pdev->dev;
