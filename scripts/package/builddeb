@@ -203,8 +203,38 @@ else
 fi
 for script in postinst postrm preinst prerm ; do
 	mkdir -p "$tmpdir$debhookdir/$script.d"
-	cat <<EOF > "$tmpdir/DEBIAN/$script"
-#!/bin/sh
+	echo "#!/bin/bash" > "$tmpdir/DEBIAN/$script"
+	if [[ "$script" = preinst ]]; then
+		cat <<EOF >> "$tmpdir/DEBIAN/$script"
+
+# Check L4T version for compatibility
+# Intended version
+JETPACK_VER="4.2.2"
+L4T_EXPECTED="32.2.1"
+
+# Get the L4T version currently installed
+L4T_VER="\$(perl -ne 'exit 1 unless /R([\d\.]+).*?REVISION: ([\d\.]+)/; print "\$1.\$2\n"; exit 0' /etc/nv_tegra_release)"
+GOT_VER_OK="\$?"
+
+if [[ "\$L4T_VER" != "\$L4T_EXPECTED" || "\$GOT_VER_OK" -ne 0 ]]; then
+    if [[ -n "\$L4T_VER" && "\$GOT_VER_OK" -eq 0 ]]; then
+        printf "\e[33mWARNING:\e[0m This release is meant for Linux for Tegra v"\$L4T_EXPECTED" (JetPack "\$JETPACK_VER").\nCompatibility with the installed version (v"\$L4T_VER") cannot be guaranteed, and may cause problems.\nInstall anyway? (y/n):"
+    else
+        printf "\e[33mWARNING:\e[0m Unable to determine installed version of Linux for Tegra.\nIf version "\$L4T_EXPECTED" (JetPack "\$JETPACK_VER") is installed, you may continue.\nOtherwise, compatibility cannot be guaranteed.\nContinue installation? (y/n):"
+    fi
+
+    while read choice; do
+        case "\$choice" in
+            y|Y ) break;;
+            n|N ) echo "Aborting..."; exit 1;;
+            * ) echo "Enter y or n:";;
+        esac
+    done
+fi
+
+EOF
+	fi
+	cat <<EOF >> "$tmpdir/DEBIAN/$script"
 
 set -e
 
