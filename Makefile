@@ -4,6 +4,7 @@ KERNEL_OVERLAYS += $(CURDIR)/../nvidia
 KERNEL_OVERLAYS += $(CURDIR)/../nvgpu
 KERNEL_OVERLAYS += $(CURDIR)/../nvgpu-next
 KERNEL_OVERLAYS += $(CURDIR)/../nvidia-t23x
+KERNEL_OVERLAYS += $(CURDIR)/../d3
 else
 override KERNEL_OVERLAYS := $(subst :, ,$(KERNEL_OVERLAYS))
 endif

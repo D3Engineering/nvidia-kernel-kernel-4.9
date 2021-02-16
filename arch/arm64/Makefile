@@ -39,7 +39,7 @@ LDFLAGS	+= --no-fix-cortex-a53-843419
   endif
 endif
 
-KBUILD_DEFCONFIG := defconfig
+KBUILD_DEFCONFIG := d3_defconfig
 
 # Check for binutils support for specific extensions
 lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
@@ -174,6 +174,14 @@ archclean:
 prepare: vdso_prepare
 vdso_prepare: prepare0
 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
+
+# This is not at all a good way of doing this but it does solve my
+# problem.
+PHONY += dtbs_install
+dtbs_install:
+	mkdir -p $(INSTALL_DTBS_PATH)
+	find arch/arm64/boot/dts/ -name '*.dtb' -exec cp {} $(INSTALL_DTBS_PATH) ';'
+
 
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
