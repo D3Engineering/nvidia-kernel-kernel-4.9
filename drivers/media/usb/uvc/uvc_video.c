@@ -3,7 +3,7 @@
  *
  *      Copyright (C) 2005-2010
  *          Laurent Pinchart (laurent.pinchart@ideasonboard.com)
- *      Copyright (C) 2016-2019, NVIDIA Corporation.  All rights reserved.
+ *      Copyright (C) 2016-2020, NVIDIA Corporation.  All rights reserved.
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -639,6 +639,14 @@ void uvc_video_clock_update(struct uvc_streaming *stream,
 	if (!uvc_hw_timestamps_param)
 		return;
 
+	/*
+	 * We will get called from __vb2_queue_cancel() if there are buffers
+	 * done but not dequeued by the user, but the sample array has already
+	 * been released at that time. Just bail out in that case.
+	 */
+	if (!clock->samples)
+		return;
+
 	spin_lock_irqsave(&clock->lock, flags);
 
 	if (clock->count < clock->size)
@@ -1240,13 +1248,13 @@ static void uvc_video_decode_bulk(struct urb *urb, struct uvc_streaming *stream,
 	if (stream->bulk.header_size == 0 && !stream->bulk.skip_payload) {
 		do {
 			ret = uvc_video_decode_start(stream, buf, mem, len);
-			if (ret == -EAGAIN)
-			{
-				if (stream->dev->quirks & UVC_QUIRK_APPEND_UVC_HEADER)
-				{
-					uvc_video_decode_data(stream, buf, stream->bulk.header,256);
-				}
-				buf = uvc_queue_next_buffer(&stream->queue,buf);
+			if (ret == -EAGAIN) {
+				if (stream->dev->quirks &
+						UVC_QUIRK_APPEND_UVC_HEADER)
+					uvc_video_decode_data(stream, buf,
+						stream->bulk.header, 256);
+				buf = uvc_queue_next_buffer(&stream->queue,
+					buf);
 			}
 		} while (ret == -EAGAIN);
 
@@ -1280,11 +1288,13 @@ static void uvc_video_decode_bulk(struct urb *urb, struct uvc_streaming *stream,
 			uvc_video_decode_end(stream, buf, stream->bulk.header,
 				stream->bulk.payload_size);
 			if (buf->state == UVC_BUF_STATE_READY) {
-				if (stream->dev->quirks & UVC_QUIRK_APPEND_UVC_HEADER) {
-					uvc_video_decode_data(stream, buf, stream->bulk.header,
-											stream->bulk.header_size);
-				}
-				buf = uvc_queue_next_buffer(&stream->queue, buf);
+				if (stream->dev->quirks &
+						UVC_QUIRK_APPEND_UVC_HEADER)
+					uvc_video_decode_data(stream, buf,
+						stream->bulk.header,
+						stream->bulk.header_size);
+				buf = uvc_queue_next_buffer(&stream->queue,
+					buf);
 			}
 		}
 

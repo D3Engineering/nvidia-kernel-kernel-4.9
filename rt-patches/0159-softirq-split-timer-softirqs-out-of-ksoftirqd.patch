@@ -1,7 +1,8 @@
-From c7c328b3489342fe7e1adaf0952bef0a633b5448 Mon Sep 17 00:00:00 2001
+From ad7ce20389a993504bdd01ce3aa8f2d918a7ccdf Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 20 Jan 2016 16:34:17 +0100
-Subject: [PATCH 159/352] softirq: split timer softirqs out of ksoftirqd
+Subject: [PATCH 159/371] softirq: split timer softirqs out of ksoftirqd
+X-NVConfidentiality: public
 
 The softirqd runs in -RT with SCHED_FIFO (prio 1) and deals mostly with
 timer wakeup which can not happen in hardirq context. The prio has been
@@ -27,7 +28,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 73 insertions(+), 12 deletions(-)
 
 diff --git a/kernel/softirq.c b/kernel/softirq.c
-index 62f01b76..be66205 100644
+index 8957a27..af0b78e 100644
 --- a/kernel/softirq.c
 +++ b/kernel/softirq.c
 @@ -58,6 +58,10 @@ EXPORT_SYMBOL(irq_stat);
@@ -165,7 +166,7 @@ index 62f01b76..be66205 100644
  #endif /* PREEMPT_RT_FULL */
  /*
   * Enter an interrupt context.
-@@ -763,6 +809,9 @@ static inline void invoke_softirq(void)
+@@ -764,6 +810,9 @@ static inline void invoke_softirq(void)
  	if (__this_cpu_read(ksoftirqd) &&
  			__this_cpu_read(ksoftirqd)->softirqs_raised)
  		wakeup_softirqd();
@@ -175,7 +176,7 @@ index 62f01b76..be66205 100644
  	local_irq_restore(flags);
  #endif
  }
-@@ -1180,18 +1229,30 @@ static int takeover_tasklets(unsigned int cpu)
+@@ -1181,18 +1230,30 @@ static int takeover_tasklets(unsigned int cpu)
  static struct smp_hotplug_thread softirq_threads = {
  	.store			= &ksoftirqd,
  	.setup			= ksoftirqd_set_sched_params,

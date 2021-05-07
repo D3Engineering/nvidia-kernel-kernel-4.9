@@ -246,9 +246,11 @@ static int accel_3d_capture_sample(struct hid_sensor_hub_device *hsdev,
 						*(u32 *)raw_data;
 		ret = 0;
 	break;
-	case HID_USAGE_SENSOR_TIME_TIMESTAMP: // usec->nsec
-		accel_state->timestamp = (*(int64_t *)raw_data)*1000;
-		ret = 0;
+	case HID_USAGE_SENSOR_TIME_TIMESTAMP:
+		accel_state->timestamp =
+			hid_sensor_convert_timestamp(
+					&accel_state->common_attributes,
+					*(int64_t *)raw_data);
 	break;
 	default:
 		break;
