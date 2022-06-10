@@ -833,7 +833,7 @@ static int raid10_congested(struct mddev *mddev, int bits)
 		if (rdev && !test_bit(Faulty, &rdev->flags)) {
 			struct request_queue *q = bdev_get_queue(rdev->bdev);
 
-			ret |= bdi_congested(&q->backing_dev_info, bits);
+			ret |= bdi_congested(q->backing_dev_info, bits);
 		}
 	}
 	rcu_read_unlock();
@@ -3770,8 +3770,8 @@ static int raid10_run(struct mddev *mddev)
 		 * maybe...
 		 */
 		stripe /= conf->geo.near_copies;
-		if (mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
-			mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
+		if (mddev->queue->backing_dev_info->ra_pages < 2 * stripe)
+			mddev->queue->backing_dev_info->ra_pages = 2 * stripe;
 	}
 
 	if (md_integrity_register(mddev))
@@ -3798,6 +3798,8 @@ static int raid10_run(struct mddev *mddev)
 		set_bit(MD_RECOVERY_RUNNING, &mddev->recovery);
 		mddev->sync_thread = md_register_thread(md_do_sync, mddev,
 							"reshape");
+		if (!mddev->sync_thread)
+			goto out_free_conf;
 	}
 
 	return 0;
@@ -4489,7 +4491,6 @@ bio_full:
 	atomic_inc(&r10_bio->remaining);
 	read_bio->bi_next = NULL;
 	generic_make_request(read_bio);
-	sector_nr += nr_sectors;
 	sectors_done += nr_sectors;
 	if (sector_nr <= last)
 		goto read_more;
@@ -4577,8 +4578,8 @@ static void end_reshape(struct r10conf *conf)
 		int stripe = conf->geo.raid_disks *
 			((conf->mddev->chunk_sectors << 9) / PAGE_SIZE);
 		stripe /= conf->geo.near_copies;
-		if (conf->mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
-			conf->mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
+		if (conf->mddev->queue->backing_dev_info->ra_pages < 2 * stripe)
+			conf->mddev->queue->backing_dev_info->ra_pages = 2 * stripe;
 	}
 	conf->fullsync = 0;
 }

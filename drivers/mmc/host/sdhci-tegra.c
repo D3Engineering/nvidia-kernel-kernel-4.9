@@ -215,7 +215,6 @@ struct sdhci_tegra {
 	#define TUNING_STATUS_RETUNE	2
 	bool disable_auto_cal;
 	int timing;
-	bool set_1v8_calib_offsets;
 	int current_voltage;
 	unsigned int cd_irq;
 	bool pwrdet_support;
@@ -460,7 +459,6 @@ static void tegra_sdhci_card_event(struct sdhci_host *host)
 	tegra_host->tuning_status = TUNING_STATUS_RETUNE;
 	host->is_calib_done = false;
 	if (!host->mmc->rem_card_present) {
-		tegra_host->set_1v8_calib_offsets = false;
 		if (!IS_ERR_OR_NULL(host->mmc->supply.vmmc) &&
 			regulator_is_enabled(host->mmc->supply.vmmc) &&
 			!tegra_host->vmmc_always_on) {
@@ -864,7 +862,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 			misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_DDR50;
 		if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR104)
 			misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_SDR104;
-		if (soc_data->nvquirks & SDHCI_MISC_CTRL_ENABLE_SDR50)
+		if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50)
 			clk_ctrl |= SDHCI_CLOCK_CTRL_SDR50_TUNING_OVERRIDE;
 	}
 	if (soc_data->nvquirks & NVQUIRK_SDMMC_CLK_OVERRIDE) {
@@ -1305,10 +1303,8 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	default:
 		break;
 	}
-	if ((timing > tegra_host->timing) &&
-			!tegra_host->set_1v8_calib_offsets) {
+	if (timing > tegra_host->timing) {
 		tegra_sdhci_pad_autocalib(host);
-		tegra_host->set_1v8_calib_offsets = true;
 		tegra_host->timing = timing;
 	}
 
@@ -2389,6 +2385,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	if (tegra_host->en_periodic_cflush)
 		host->mmc->caps2 |= MMC_CAP2_PERIODIC_CACHE_FLUSH;
+
+	if (tegra_host->vmmc_always_on)
+		host->mmc->caps2 |= MMC_CAP2_SLOT_REG_ALWAYS_ON;
 
 	host->mmc->caps2 |= MMC_CAP2_EN_CLK_TO_ACCESS_REG;
 	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
